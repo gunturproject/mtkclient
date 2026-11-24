@@ -223,7 +223,11 @@ class BoundSignal:
             except Exception:
                 # A broken slot must not kill the device I/O thread.
                 import traceback
-                traceback.print_exc()
+                try:
+                    if sys.stderr is not None:
+                        traceback.print_exc()
+                except Exception:
+                    pass
         return self
 
     def __call__(self, *args):

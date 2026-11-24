@@ -22,6 +22,39 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QAction
 
 
+# Chaquopy does not always provide stdout/stderr on the Python worker thread.
+# mtkclient's logging config and many except blocks call print(), which would
+# otherwise raise: AttributeError: 'NoneType' object has no attribute 'write'.
+class _SafeStream:
+    def write(self, text):
+        try:
+            from java import jclass
+            jclass("android.util.Log").d("MTKClientPython", str(text).rstrip())
+        except Exception:
+            pass
+        return len(str(text))
+
+    def flush(self): pass
+    def isatty(self): return False
+    def writable(self): return True
+    def writelines(self, lines):
+        for line in lines:
+            self.write(line)
+
+
+if sys.stdout is None:
+    sys.stdout = _SafeStream()
+if sys.stderr is None:
+    sys.stderr = _SafeStream()
+
+# mtkclient's UsbClass only initialises `self.backend` for linux/win32/darwin.
+# Chaquopy reports 'android', which leaves the attribute unset and crashes
+# DeviceHandler construction.  Android uses the same /dev + libusb-style paths
+# as Linux here, and our usb.backend.libusb1 shim returns None safely.
+if sys.platform == "android":
+    sys.platform = "linux"
+
+
 class _State:
     def __init__(self):
         self.app = None
@@ -599,3 +632,46 @@ def api(method, *args):
     if method == "root_check":
         return "yes" if _java().hasRoot() else "no"
     return "unknown:" + method
+
+
+# ---------------------------------------------------------------------------
+# Compatibility façade used by the shim modules (`from android_bridge import bridge`).
+# ---------------------------------------------------------------------------
+class _Bridge:
+    # UI
+    open_url = staticmethod(open_url)
+    show_message = staticmethod(show_message)
+    prompt = staticmethod(prompt)
+    pick_file = staticmethod(pick_file)
+    run_modal = staticmethod(run_modal)
+    # Device discovery
+    list_usb_devices = staticmethod(list_usb_devices)
+    list_serial_ports = staticmethod(list_serial_ports)
+    # USB host I/O
+    bulk_write = staticmethod(bulk_write)
+    bulk_read = staticmethod(bulk_read)
+    control_transfer = staticmethod(control_transfer)
+    set_configuration = staticmethod(set_configuration)
+    clear_halt = staticmethod(clear_halt)
+    reset_device = staticmethod(reset_device)
+    # Root serial I/O
+    serial_open = staticmethod(serial_open)
+    serial_close = staticmethod(serial_close)
+    serial_write = staticmethod(serial_write)
+    serial_read = staticmethod(serial_read)
+    serial_available = staticmethod(serial_available)
+    serial_discard_input = staticmethod(serial_discard_input)
+    serial_send_break = staticmethod(serial_send_break)
+    serial_set_signals = staticmethod(serial_set_signals)
+    # Optional native-tool providers
+    asm = staticmethod(asm)
+    disasm = staticmethod(disasm)
+    uc_mem_map = staticmethod(uc_mem_map)
+    uc_mem_write = staticmethod(uc_mem_write)
+    uc_mem_read = staticmethod(uc_mem_read)
+    uc_reg_write = staticmethod(uc_reg_write)
+    uc_reg_read = staticmethod(uc_reg_read)
+    uc_emu_start = staticmethod(uc_emu_start)
+
+
+bridge = _Bridge()

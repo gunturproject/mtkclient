@@ -196,6 +196,11 @@ class QFontDatabase:
 
 
 class QTextOption:
+    NoWrap = 0
+    WordWrap = 1
+    ManualWrap = 2
+    WrapAnywhere = 3
+
     def __init__(self, *a, **kw): pass
     class WrapMode(_EnumNS):
         __values__ = {"NoWrap": 0, "WordWrap": 1, "ManualWrap": 2, "WrapAnywhere": 3}
