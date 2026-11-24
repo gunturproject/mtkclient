@@ -1,0 +1,81 @@
+name: 1. Generate & store signing keystore
+
+# Run once, manually. It creates a self-signed release keystore with keytool,
+# then stores the keystore and its passwords as repository Actions secrets.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  setup-signing:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (for tools/set-secret.js)
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (keytool)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Node 20 (secret encryption helper)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Generate random passwords and aliases
+        id: sign
+        shell: bash
+        run: |
+          STORE_PASS="$(openssl rand -base64 36 | tr -d '\n')"
+          KEY_PASS="$(openssl rand -base64 36 | tr -d '\n')"
+          echo "::add-mask::$STORE_PASS"
+          echo "::add-mask::$KEY_PASS"
+          echo "store-pass=$STORE_PASS" >> "$GITHUB_OUTPUT"
+          echo "key-pass=$KEY_PASS" >> "$GITHUB_OUTPUT"
+          echo "key-alias=mtkclient-release" >> "$GITHUB_OUTPUT"
+
+      - name: Generate keystore
+        env:
+          SIGNING_STORE_PASSWORD: ${{ steps.sign.outputs.store-pass }}
+          SIGNING_KEY_PASSWORD: ${{ steps.sign.outputs.key-pass }}
+          KEY_ALIAS: ${{ steps.sign.outputs.key-alias }}
+        shell: bash
+        run: |
+          mkdir -p signing
+          keytool -genkeypair -v \
+            -storetype JKS \
+            -keystore signing/mtkclient-release.jks \
+            -alias "$KEY_ALIAS" \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass:env SIGNING_STORE_PASSWORD \
+            -keypass:env SIGNING_KEY_PASSWORD \
+            -dname "CN=mtkclient-android, OU=Android, O=mtkclient, L=Jakarta, ST=DKI, C=ID" \
+            -noprompt
+
+      - name: Store keystore and passwords in GitHub Secrets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          STORE_PASS: ${{ steps.sign.outputs.store-pass }}
+          KEY_PASS: ${{ steps.sign.outputs.key-pass }}
+          KEY_ALIAS: ${{ steps.sign.outputs.key-alias }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -w 0 signing/mtkclient-release.jks > signing/keystore.b64
+          node tools/set-secret.js "${{ github.repository }}" SIGNING_KEYSTORE_BASE64 "$(cat signing/keystore.b64)"
+          node tools/set-secret.js "${{ github.repository }}" SIGNING_STORE_PASSWORD "$STORE_PASS"
+          node tools/set-secret.js "${{ github.repository }}" SIGNING_KEY_ALIAS "$KEY_ALIAS"
+          node tools/set-secret.js "${{ github.repository }}" SIGNING_KEY_PASSWORD "$KEY_PASS"
+          echo "::notice::Signing secrets created: SIGNING_KEYSTORE_BASE64, SIGNING_STORE_PASSWORD, SIGNING_KEY_ALIAS, SIGNING_KEY_PASSWORD"
+
+      - name: Upload keystore backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: signing-keystore-backup
+          path: signing/mtkclient-release.jks
+          retention-days: 7
+          if-no-files-found: error

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- MediaTek preloader / DA / CDC interfaces used by mtkclient -->
+    <usb-device vendor-id="3712" product-id="3" />       <!-- 0x0E8D:0x0003 Preloader -->
+    <usb-device vendor-id="3712" product-id="131" />     <!-- 0x0E8D:0x0083 -->
+    <usb-device vendor-id="3712" product-id="16389" />   <!-- 0x0E8D:0x4005 -->
+    <usb-device vendor-id="3712" product-id="16417" />   <!-- 0x0E8D:0x4001 -->
+    <usb-device vendor-id="3712" product-id="16418" />   <!-- 0x0E8D:0x4002 -->
+    <usb-device vendor-id="3712" product-id="16419" />   <!-- 0x0E8D:0x4003 -->
+    <usb-device vendor-id="4354" />                      <!-- 0x1004 VIA/MTK -->
+    <usb-device vendor-id="8928" />                      <!-- 0x22D9 -->
+    <usb-device vendor-id="3854" />                      <!-- 0x0FCE -->
+</resources>

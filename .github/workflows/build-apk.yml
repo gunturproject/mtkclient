@@ -1,0 +1,75 @@
+name: 2. Build signed Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Python 3.13 (Chaquopy buildPython)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Decode signing keystore from secrets
+        env:
+          SIGNING_B64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${SIGNING_B64:-}" ]; then
+            echo "::warning::SIGNING_KEYSTORE_BASE64 is empty - falling back to the debug signing key."
+            exit 0
+          fi
+          mkdir -p signing
+          printf '%s' "$SIGNING_B64" | base64 --decode > signing/release.jks
+          echo "SIGNING_KEYSTORE_FILE=$GITHUB_WORKSPACE/signing/release.jks" >> "$GITHUB_ENV"
+          echo "Keystore decoded ($(stat -c%s signing/release.jks) bytes)."
+
+      - name: Build release APK
+        env:
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          ANDROID_HOME: /usr/local/lib/android/sdk
+        shell: bash
+        run: gradle --no-daemon --stacktrace assembleRelease
+
+      - name: Verify APK is signed
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" verify --print-certs "$APK"
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mtkclient-android-signed
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
