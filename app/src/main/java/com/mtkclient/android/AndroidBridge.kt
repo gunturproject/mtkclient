@@ -289,8 +289,6 @@ object AndroidBridge {
                 put("deviceClass", device.deviceClass)
                 put("deviceSubClass", device.deviceSubclass)
                 put("deviceProtocol", device.deviceProtocol)
-                put("deviceAddress", device.deviceAddress)
-                put("busNumber", device.busNumber)
                 put("productName", device.productName ?: "")
                 put("manufacturerName", device.manufacturerName ?: "")
                 put("serialNumber", device.serialNumber ?: "")
@@ -394,9 +392,21 @@ object AndroidBridge {
 
     @JvmStatic fun usbSetConfiguration(deviceId: String, value: Int): Boolean {
         val connection = openConnection(deviceId) ?: return false
-        val ok = connection.setConfiguration(value)
-        findDevice(deviceId)?.let { claimAll(it, connection) }
+        val device = findDevice(deviceId) ?: return false
+        var config: android.hardware.usb.UsbConfiguration? = null
+        for (i in 0 until device.configurationCount) {
+            val candidate = device.getConfiguration(i) ?: continue
+            if (candidate.id == value) { config = candidate; break }
+        }
+        if (config == null && device.configurationCount > 0) config = device.getConfiguration(0)
+        val ok = if (config != null) connection.setConfiguration(config) else false
+        releaseClaimed(deviceId, connection)
+        claimAll(device, connection)
         return ok
+    }
+
+    private fun releaseClaimed(deviceId: String, connection: UsbDeviceConnection) {
+        claimed.remove(deviceId)?.forEach { connection.releaseInterface(it) }
     }
 
     @JvmStatic fun usbBulkWrite(deviceId: String, endpoint: Int, data: ByteArray, timeout: Int): Int {
@@ -443,11 +453,28 @@ object AndroidBridge {
     }
 
     @JvmStatic fun usbClearHalt(deviceId: String, endpoint: Int): Boolean {
-        val ep = findEndpoint(deviceId, endpoint) ?: return false
-        return connections[deviceId]?.clearHalt(ep) ?: false
+        val connection = openConnection(deviceId) ?: return false
+        // USB RECIP_ENDPOINT / CLEAR_FEATURE(0x01) / ENDPOINT_HALT(0x00)
+        val requestType = UsbConstants.USB_TYPE_STANDARD or UsbConstants.USB_RECIP_ENDPOINT
+        return connection.controlTransfer(requestType, 0x01, 0x00, endpoint,
+                                          ByteArray(0), 0, 1000) >= 0
     }
 
-    @JvmStatic fun usbReset(deviceId: String): Boolean = connections[deviceId]?.reset() ?: false
+    @JvmStatic fun usbReset(deviceId: String): Boolean {
+        val connection = openConnection(deviceId) ?: return false
+        // SET_ADDRESS(0x03) with address 0 is the closest portable equivalent
+        // of libusb_reset_device on Android's host API.
+        val requestType = UsbConstants.USB_TYPE_STANDARD or UsbConstants.USB_RECIP_DEVICE
+        val ok = connection.controlTransfer(requestType, 0x03, 0, 0,
+                                            ByteArray(0), 0, 1000) >= 0
+        if (ok) {
+            findDevice(deviceId)?.let { device ->
+                releaseClaimed(deviceId, connection)
+                claimAll(device, connection)
+            }
+        }
+        return ok
+    }
 
     @JvmStatic fun requestUsbPermission(deviceId: String): Boolean {
         val manager = usbManager ?: return false
