@@ -58,13 +58,25 @@ jobs:
         shell: bash
         run: gradle --no-daemon --stacktrace assembleRelease
 
-      - name: Verify APK is signed
+      - name: Verify APK is signed with v1 + v2 + v3
         shell: bash
         run: |
           set -euo pipefail
           APK="app/build/outputs/apk/release/app-release.apk"
           test -s "$APK"
-          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner" verify --print-certs "$APK"
+          APKSIGNER="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
+          OUT="$("$APKSIGNER" verify --verbose --print-certs "$APK")"
+          printf '%s\n' "$OUT"
+          for SCHEME in \
+            "v1 scheme (JAR signing)" \
+            "v2 scheme (APK Signature Scheme v2)" \
+            "v3 scheme (APK Signature Scheme v3)"; do
+            if ! printf '%s\n' "$OUT" | grep -qF "Verified using $SCHEME: true"; then
+              echo "::error::APK is not verified with $SCHEME"
+              exit 1
+            fi
+          done
+          echo "APK verified with v1, v2 and v3 signature schemes."
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4

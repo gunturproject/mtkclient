@@ -42,7 +42,20 @@ android {
                 storePassword = signingPass
                 keyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: "mtkclient-release"
                 keyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: signingPass
+
+                // Sign with all three APK signature schemes so the APK installs on
+                // legacy (v1/JAR), modern (v2) and newest (v3) Android verifiers.
+                isV1SigningEnabled = true
+                isV2SigningEnabled = true
+                isV3SigningEnabled = true
             }
+        }
+        // The debug fallback used when signing secrets are absent gets the same
+        // scheme coverage, keeping local CI/test builds installable everywhere.
+        getByName("debug") {
+            isV1SigningEnabled = true
+            isV2SigningEnabled = true
+            isV3SigningEnabled = true
         }
     }
 
