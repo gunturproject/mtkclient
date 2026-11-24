@@ -609,8 +609,13 @@ def run_modal(dialog):
     body = _render_widget(dialog)
     buttons = ("<button data-action='dialog-accept' data-widget='%s'>OK</button>"
                "<button data-action='dialog-reject' data-widget='%s'>Cancel</button>" % (wid, wid))
-    _java().showDialog("<h2>%s</h2>%s<div class='dialog-actions'>%s</div>" %
-                       (_esc(dialog.windowTitle()), body, buttons))
+    dialog_html = ("<!doctype html><html><head><meta name='viewport' "
+                   "content='width=device-width,initial-scale=1'><style>%s"
+                   ".dialog-actions{display:flex;gap:8px;margin-top:12px}"
+                   "</style></head><body style='padding:16px'><h2>%s</h2>%s"
+                   "<div class='dialog-actions'>%s</div></body></html>" %
+                   (CSS, _esc(dialog.windowTitle()), body, buttons))
+    _java().showDialog(dialog_html)
     result = _java().waitForDialog(str(wid))
     with state.lock:
         state.dialogs.pop(wid, None)

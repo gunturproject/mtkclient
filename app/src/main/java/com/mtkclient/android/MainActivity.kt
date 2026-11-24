@@ -128,6 +128,12 @@ class MainActivity : AppCompatActivity() {
     inner class JsBridge {
         @JavascriptInterface
         fun handleWidget(widgetId: String, action: String, value: String) {
+            // Modal dialogs block the Python worker inside run_modal()/waitForDialog().
+            // Resolve them directly on the UI thread to avoid queuing behind that block.
+            if (action == "dialog-accept" || action == "dialog-reject") {
+                AndroidBridge.dialogResolved(action == "dialog-accept")
+                return
+            }
             pythonExecutor.execute {
                 try {
                     Python.getInstance().getModule("android_bridge")
