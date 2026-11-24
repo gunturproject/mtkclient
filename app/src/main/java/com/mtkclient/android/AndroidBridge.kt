@@ -455,7 +455,7 @@ object AndroidBridge {
     @JvmStatic fun usbClearHalt(deviceId: String, endpoint: Int): Boolean {
         val connection = openConnection(deviceId) ?: return false
         // USB RECIP_ENDPOINT / CLEAR_FEATURE(0x01) / ENDPOINT_HALT(0x00)
-        val requestType = UsbConstants.USB_TYPE_STANDARD or UsbConstants.USB_RECIP_ENDPOINT
+        val requestType = UsbConstants.USB_TYPE_STANDARD or 0x02 // USB_RECIP_ENDPOINT
         return connection.controlTransfer(requestType, 0x01, 0x00, endpoint,
                                           ByteArray(0), 0, 1000) >= 0
     }
@@ -464,7 +464,7 @@ object AndroidBridge {
         val connection = openConnection(deviceId) ?: return false
         // SET_ADDRESS(0x03) with address 0 is the closest portable equivalent
         // of libusb_reset_device on Android's host API.
-        val requestType = UsbConstants.USB_TYPE_STANDARD or UsbConstants.USB_RECIP_DEVICE
+        val requestType = UsbConstants.USB_TYPE_STANDARD or 0x00 // USB_RECIP_DEVICE
         val ok = connection.controlTransfer(requestType, 0x03, 0, 0,
                                             ByteArray(0), 0, 1000) >= 0
         if (ok) {

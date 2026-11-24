@@ -30,6 +30,8 @@ class QPixmap:
     def height(self): return self._h
     def size(self): return QSize(self._w, self._h)
     def scaled(self, *a, **kw): return QPixmap()
+    def setDevicePixelRatio(self, ratio): self._dpr = ratio
+    def devicePixelRatio(self): return getattr(self, "_dpr", 1)
     def save(self, *a, **kw): return False
 
 
