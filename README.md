@@ -30,7 +30,9 @@ The signing workflow creates these automatically (run **1. Generate & store sign
 ## Build
 
 Push to `main` (or run **2. Build signed Android APK** manually). The signed APK is
-uploaded as the `mtkclient-android-signed` artifact.
+uploaded as the `mtkclient-android-signed` artifact. It is signed with APK Signature
+Schemes **v1 (JAR), v2 and v3**; the workflow fails the build unless `apksigner`
+verifies all three.
 
 ## Device requirements
 
