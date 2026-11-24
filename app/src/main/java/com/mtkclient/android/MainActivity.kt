@@ -145,7 +145,7 @@ class MainActivity : AppCompatActivity() {
                     val json = Python.getInstance().getModule("android_bridge")
                         .callAttr("sync_state").toString()
                     runOnUiThread {
-                        webView.evaluateJavascript("$callback($json)", null)
+                        webView.evaluateJavascript("($callback)($json)", null)
                     }
                 } catch (e: Throwable) {
                     // Polling is best-effort; never disturb the user for sync failures.
