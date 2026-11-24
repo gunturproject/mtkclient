@@ -477,6 +477,7 @@ document.addEventListener('click', function(e){
   if(!el) return;
   if(el.classList.contains('tabbtn')){send(el,'tab',el.dataset.value);return;}
   if(el.classList.contains('listitem')){send(el,'row',el.dataset.value);return;}
+  if(el.dataset.action){send(el,el.dataset.action,el.dataset.value||'');return;}
   send(el,'click','');
 });
 document.addEventListener('change', function(e){
